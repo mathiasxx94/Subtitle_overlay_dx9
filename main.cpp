@@ -7,6 +7,7 @@
 
 #include <windows.h>
 #include <iostream>
+#include <chrono>
 
 #include "text parsing.h"
 
@@ -17,6 +18,10 @@ wchar_t hWindowName[256] = L"Subtitle_generator";
 int Height, Width;
 std::wstring ligne;
 std::vector<timeSubpacket> subtitlePacket;
+
+static float currenttime = 0;
+static int currentframe = 0;
+static bool ispaused = 1;  
 
 // DX9
 IDirect3D9Ex* p_Object = 0;
@@ -82,7 +87,7 @@ int D3D9XInit(HWND hWnd)
 	}
 
 	D3DXCreateFontA(p_Device, 12, 0, 0, 0, false, DEFAULT_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, "Calibri Light", &pFontSmall);
-	D3DXCreateFontW(p_Device, 38, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"MS PMincho", &pFontBig); //Meiryo
+	D3DXCreateFontW(p_Device, 38, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Meiryo", &pFontBig); //MS PMincho
 
 	return 0;
 }
@@ -123,12 +128,17 @@ int main()
 
 	for (;;)
 	{
+		auto t1 = std::chrono::high_resolution_clock::now();
+
 		if (PeekMessage(&Message, hWnd, 0, 0, PM_REMOVE))
 		{
 			DispatchMessage(&Message);
 			TranslateMessage(&Message);
 		}
 		Sleep(10);
+		auto t2 = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<float, std::milli> fp_ms = t2 - t1; 
+		if (!ispaused) currenttime += (fp_ms.count() / 1000.f);  
 	}
 	
 	return 0;
@@ -165,17 +175,34 @@ int DrawingPart()
 {
 	p_Device->Clear(0, 0, D3DCLEAR_TARGET, 0, 1.0f, 0);
 	p_Device->BeginScene();
-
-
-	r++;
-	if (r >= 255) { r = 1; }
 	
-	ligne = subtitlePacket[r].subline2;
-	DrawFilledRectangle(10, 55 + r, 1000, 80 + r, 200, 20, 20, 20);
-	//DrawStringA((char*)"hallo", 10, 50, r, g, b, 150, pFontBig);
-	//std::wstring hei{L"テラスハウスは" };
+	if (currenttime >= subtitlePacket[currentframe].secEnd)
+	{
+		currentframe += 1;
+	}
+	if (GetAsyncKeyState(VK_RIGHT) & 1)
+	{
+		currentframe += 1;
+		currenttime = subtitlePacket[currentframe].secStart;
+	}
+	if (GetAsyncKeyState(VK_LEFT) & 1)
+	{
+		currentframe -= 1;
+		if (currentframe < 0) currentframe = 0;
+		currenttime = subtitlePacket[currentframe].secStart;
+	}
+	if (GetAsyncKeyState(VK_SPACE) & 1)
+	{
+		ispaused = !ispaused;
+	}
 
-	DrawStringW(ligne.c_str(), 10, 50 + r, 255, 255, 255, 255, pFontBig); //(wchar_t*)L"（YOU(ユウ)）テラスハウスは 見ず知らずの男女６人が" instead of hei.c_str()
+	ligne = subtitlePacket[currentframe].subline1;
+	DrawFilledRectangle(10, 55, 1000, 80, 200, 20, 20, 20);
+	std::wstring hei = std::to_wstring(currenttime);
+	
+	//DrawFilledRectangle(10, 550, 1000, 600, 200, 20, 20, 20);
+	DrawStringW(ligne.c_str(), 10, 50, 255, 255, 255, 255, pFontBig); //(wchar_t*)L"（YOU(ユウ)）テラスハウスは 見ず知らずの男女６人が" instead of hei.c_str()
+	DrawStringW(hei.c_str(), 10, 550, 255, 255, 255, 255, pFontBig); //delete this
 
 
 	p_Device->EndScene();
