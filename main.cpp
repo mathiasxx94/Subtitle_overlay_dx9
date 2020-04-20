@@ -3,11 +3,12 @@
 #pragma comment(lib, "d3d9.lib")
 #pragma comment(lib, "d3dx9.lib")
 #include <dwmapi.h>
-#pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "dwmapi.lib")  
 
 #include <windows.h>
 #include <iostream>
 #include <chrono>
+#include <iomanip>
 
 #include "text parsing.h"
 
@@ -22,6 +23,8 @@ std::vector<timeSubpacket> subtitlePacket;
 static float currenttime = 0;
 static int currentframe = 0;
 static bool ispaused = 1;  
+static int fontHeight = 50;
+static int yposoffset = 0;
 
 // DX9
 IDirect3D9Ex* p_Object = 0;
@@ -31,11 +34,12 @@ ID3DXFont* pFontSmall = 0;
 ID3DXFont* pFontBig = 0;
 const MARGINS margin = { -1 };
 MSG Message;
-int r = 1;
 
 
 // Functions
 int DrawingPart();
+void fillWidths(ID3DXFont* ifont);    
+
 LRESULT CALLBACK WinProc(HWND hWnd, UINT Message, WPARAM wParam, LPARAM lParam);
 //int DrawStringA(const char* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont);
 int D3D9XInit(HWND hWnd);
@@ -72,7 +76,7 @@ int D3D9XInit(HWND hWnd)
 
 	ZeroMemory(&p_Params, sizeof(p_Params));
 	p_Params.Windowed = TRUE;
-	p_Params.SwapEffect = D3DSWAPEFFECT_DISCARD;
+	p_Params.SwapEffect = D3DSWAPEFFECT_DISCARD; 
 	p_Params.hDeviceWindow = hWnd;
 	p_Params.MultiSampleQuality = D3DMULTISAMPLE_NONE;
 	p_Params.BackBufferFormat = D3DFMT_X8R8G8B8;
@@ -86,8 +90,8 @@ int D3D9XInit(HWND hWnd)
 		exit(1);
 	}
 
-	D3DXCreateFontA(p_Device, 12, 0, 0, 0, false, DEFAULT_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, "Calibri Light", &pFontSmall);
-	D3DXCreateFontW(p_Device, 38, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Meiryo", &pFontBig); //MS PMincho
+	D3DXCreateFontA(p_Device, 20, 0, 0, 0, false, DEFAULT_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, "Calibri Light", &pFontSmall);
+	D3DXCreateFontW(p_Device, fontHeight, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Meiryo", &pFontBig); //MS PMincho 
 
 	return 0;
 }
@@ -121,10 +125,9 @@ int main()
 	D3D9XInit(hWnd);
 
 	//Init file load
-	
 	fillVector();
+	fillWidths(pFontBig);
 	
-
 
 	for (;;)
 	{
@@ -144,14 +147,57 @@ int main()
 	return 0;
 }
 
-
-int DrawStringA(char* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont)
+int calctextWidth(const wchar_t* String, ID3DXFont* ifont)
 {
 	RECT FontPos;
-	FontPos.left = x;
-	FontPos.top = y;
-	ifont->DrawTextA(0, String, strlen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(a, r, g, b));
-	return 0;
+	FontPos.left = 2;
+	FontPos.top = 2;
+	ifont->DrawTextW(0, String, wcslen(String), &FontPos, DT_CALCRECT, D3DCOLOR_XRGB(0, 0, 0));
+	int width = FontPos.right - FontPos.left;
+	return width;
+}
+
+void fillWidths(ID3DXFont* ifont) 
+{
+	for (int n = 0; n<subtitlePacket.size(); n++)
+	{
+		std::wstring  string;
+		switch (subtitlePacket[n].sublines)
+		{
+		case 1:
+			string = subtitlePacket[n].subline1;
+			subtitlePacket[n].line1Width = calctextWidth(string.c_str(), pFontBig);
+			subtitlePacket[n].longestWidth = subtitlePacket[n].line1Width;
+
+			break;
+		case 2:
+			string = subtitlePacket[n].subline1;
+			subtitlePacket[n].line1Width = calctextWidth(string.c_str(), pFontBig);
+
+			string = subtitlePacket[n].subline2;
+			subtitlePacket[n].line2Width = calctextWidth(string.c_str(), pFontBig);
+
+			subtitlePacket[n].longestWidth = max(subtitlePacket[n].line1Width, subtitlePacket[n].line2Width);
+
+			break;
+
+		case 3:
+			string = subtitlePacket[n].subline1;
+			subtitlePacket[n].line1Width = calctextWidth(string.c_str(), pFontBig);
+
+			string = subtitlePacket[n].subline2;
+			subtitlePacket[n].line2Width = calctextWidth(string.c_str(), pFontBig);
+
+			string = subtitlePacket[n].subline3;
+			subtitlePacket[n].line3Width = calctextWidth(string.c_str(), pFontBig);
+
+			int var = max(subtitlePacket[n].line1Width, subtitlePacket[n].line2Width);
+
+			subtitlePacket[n].longestWidth = max(var, subtitlePacket[n].line3Width);
+
+			break;
+		}
+	}
 }
 
 int DrawStringW(const wchar_t* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont)
@@ -159,7 +205,6 @@ int DrawStringW(const wchar_t* String, int x, int y, int r, int g, int b, int a,
 	RECT FontPos;
 	FontPos.left = x;
 	FontPos.top = y;
-	//ifont->DrawTextA(0, String, strlen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(a, r, g, b));
 	ifont->DrawTextW(0, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(a, r, g, b));
 	return 0;
 }
@@ -180,29 +225,74 @@ int DrawingPart()
 	{
 		currentframe += 1;
 	}
-	if (GetAsyncKeyState(VK_RIGHT) & 1)
+	if (GetAsyncKeyState(VK_RIGHT) & 1)     
 	{
 		currentframe += 1;
 		currenttime = subtitlePacket[currentframe].secStart;
+
+		system("CLS");
+		std::cout << "Frame: " << currentframe << std::endl;
+		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << " seconds";
 	}
 	if (GetAsyncKeyState(VK_LEFT) & 1)
 	{
 		currentframe -= 1;
 		if (currentframe < 0) currentframe = 0;
 		currenttime = subtitlePacket[currentframe].secStart;
+
+		system("CLS");
+		std::cout << "Frame: " << currentframe << std::endl;
+		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << "seconds";
 	}
 	if (GetAsyncKeyState(VK_SPACE) & 1)
 	{
 		ispaused = !ispaused;
+
+		system("CLS");
+		std::cout << "Frame: " << currentframe << std::endl;
+		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << "seconds";
+	}
+	if (GetAsyncKeyState(VK_UP) & 1)
+	{
+		yposoffset -= 2;
+	}
+	if (GetAsyncKeyState(VK_DOWN) & 1)
+	{
+		yposoffset += 2;
 	}
 
-	ligne = subtitlePacket[currentframe].subline1;
-	DrawFilledRectangle(10, 55, 1000, 80, 200, 20, 20, 20);
-	std::wstring hei = std::to_wstring(currenttime);
 	
-	//DrawFilledRectangle(10, 550, 1000, 600, 200, 20, 20, 20);
-	DrawStringW(ligne.c_str(), 10, 50, 255, 255, 255, 255, pFontBig); //(wchar_t*)L"（YOU(ユウ)）テラスハウスは 見ず知らずの男女６人が" instead of hei.c_str()
-	DrawStringW(hei.c_str(), 10, 550, 255, 255, 255, 255, pFontBig); //delete this
+	switch (subtitlePacket[currentframe].sublines)
+	{
+	case 1: 
+		DrawFilledRectangle(Width/2 - subtitlePacket[currentframe].longestWidth / 2 -3, 1300 + yposoffset, Width/2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 45 + yposoffset, 200, 10, 10, 10);
+		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+
+		break;
+	case 2:
+		DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
+		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+		DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width/2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
+
+		break;
+
+	case 3:
+		DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 135 + yposoffset, 200, 10, 10, 10);
+		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+		DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width/2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
+		DrawStringW(subtitlePacket[currentframe].subline3.c_str(), Width/2 - subtitlePacket[currentframe].line3Width / 2, 1300 + 80 + yposoffset, 255, 255, 255, 255, pFontBig);
+		
+		break;    
+	}
+	
+
+	//ligne = subtitlePacket[currentframe].subline1;
+	//DrawFilledRectangle(10, 55, 1000, 80, 200, 20, 20, 20);
+	//std::wstring hei = std::to_wstring(currenttime);
+	
+	//DrawFilledRectangle(1, 1, 60, 10, 200, 20, 20, 20);
+	//DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width/2, 50, 255, 255, 255, 255, pFontBig); //(wchar_t*)L"（YOU(ユウ)）テラスハウスは 見ず知らずの男女６人が" instead of hei.c_str()
+	//DrawStringW(hei.c_str(), 1, 1, 255, 255, 255, 255, pFontSmall); //delete this
 
 
 	p_Device->EndScene();
