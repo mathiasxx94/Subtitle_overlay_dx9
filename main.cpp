@@ -79,7 +79,7 @@ int D3D9XInit(HWND hWnd)
 	p_Params.SwapEffect = D3DSWAPEFFECT_DISCARD; 
 	p_Params.hDeviceWindow = hWnd;
 	p_Params.MultiSampleQuality = D3DMULTISAMPLE_NONE;
-	p_Params.BackBufferFormat = D3DFMT_X8R8G8B8;
+	p_Params.BackBufferFormat = D3DFMT_A8R8G8B8; // D3DFMT_X8R8G8B8
 	p_Params.BackBufferWidth = Width;
 	p_Params.BackBufferHeight = Height;
 	p_Params.EnableAutoDepthStencil = TRUE;
@@ -216,6 +216,29 @@ void DrawFilledRectangle(float x, float y, float w, float h, int a, int r, int g
 	p_Device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_TARGET, color, 0, 0);
 }
 
+void DrawFilledRect(int x0, int y0, int x1, int y1)
+{
+	int w = x1 - x0;
+	int h = y1 - y0;
+	ID3DXLine* g_pLine = 0;
+	D3DXCreateLine(p_Device, &g_pLine);
+
+	g_pLine->SetWidth(h);
+	g_pLine->SetAntialias(0);
+
+	D3DXVECTOR2 VertexList[2];
+	VertexList[0].x = x0;
+	VertexList[0].y = y0 + (h >> 1);
+	VertexList[1].x = x0 + w;
+	VertexList[1].y = y0 + (h >> 1);
+
+	D3DXVECTOR2 lines[] = { D3DXVECTOR2(0.0f, 50.0f), D3DXVECTOR2(400.0f, 500.0f) };
+
+	g_pLine->Begin();
+	g_pLine->Draw(lines, 2, D3DCOLOR_ARGB(100, 10, 10, 10));
+	g_pLine->End();
+}
+
 int DrawingPart()
 {
 	p_Device->Clear(0, 0, D3DCLEAR_TARGET, 0, 1.0f, 0);
@@ -232,12 +255,12 @@ int DrawingPart()
 
 		system("CLS");
 		std::cout << "Frame: " << currentframe << std::endl;
-		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << " seconds";
+		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << " seconds";  
 	}
 	if (GetAsyncKeyState(VK_LEFT) & 1)
 	{
 		currentframe -= 1;
-		if (currentframe < 0) currentframe = 0;
+		if (currentframe < 0) currentframe = 0; 
 		currenttime = subtitlePacket[currentframe].secStart;
 
 		system("CLS");
@@ -270,6 +293,7 @@ int DrawingPart()
 
 		break;
 	case 2:
+		//DrawFilledRect(0, 0, 200, 50);
 		DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
 		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
 		DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width/2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
