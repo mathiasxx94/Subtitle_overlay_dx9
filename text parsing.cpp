@@ -164,7 +164,7 @@ void fillVector()
 			packet.sublines = 3;
 		}
 		subtitlePacket.push_back(packet);
-		getline(subtitlefile, Line); //To get right alignment when three subtitle lines
+		getline(subtitlefile, Line); //To get correct parser alignment when three subtitle lines
 	}
 
 	subtitlefile.close();

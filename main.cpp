@@ -14,11 +14,12 @@
 #include <iomanip>
 
 #include "text parsing.h"
+#include "imguicustom.h"
 
 
 
 // Window
-wchar_t hWindowName[256] = L"Subtitle_generator";
+wchar_t hWindowName[256] = L"Subtitle_generator"; 
 int Height, Width;
 std::wstring ligne;
 std::vector<timeSubpacket> subtitlePacket;
@@ -29,6 +30,8 @@ static bool ispaused = 1;
 static int fontHeight = 50;
 static int yposoffset = 0;
 static bool showGui = 0;
+
+static float textcolor[3]{ 1.f, 1.f, 1.f };
 
 // DX9
 IDirect3D9Ex* p_Object = 0;
@@ -221,7 +224,10 @@ int DrawStringW(const wchar_t* String, int x, int y, int r, int g, int b, int a,
 	RECT FontPos;
 	FontPos.left = x;
 	FontPos.top = y;
-	ifont->DrawTextW(0, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(a, r, g, b));
+	int red = textcolor[0] * 255;
+	int green = textcolor[1] * 255;
+	int blue = textcolor[2] * 255;
+	ifont->DrawTextW(0, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(255, red, green, blue));
 	return 0;
 }
 
@@ -264,8 +270,15 @@ int DrawingPart()
 	if (showGui)
 	{
 		ImGui::Begin("Hello, world!");
-		ImGui::Text("This is some useful text.");
-		ImGui::SliderFloat("Max distance", &currenttime, 0.0f, 100.0f, "%.2fm");
+		ImGui::SliderFloat("Timeline", &currenttime, 0.0f, 100.0f, "%.2fm");
+		//ImGui::ColorPicker3("Text color", textcolor, ImGuiColorEditFlags_PickerHueWheel);
+		ImGuiCustom::colorPicker("Text color", textcolor);
+		if ((textcolor[0] <= 0.001f) && (textcolor[1] <= 0.001f) && (textcolor[2] <= 0.001f))
+		{
+			textcolor[0] = 0.002f;
+			textcolor[1] = 0.002f;
+			textcolor[2] = 0.002f;
+		}
 		ImGui::End();
 	}
 	ImGui::EndFrame();
