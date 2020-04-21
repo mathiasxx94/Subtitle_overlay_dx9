@@ -1,4 +1,7 @@
-﻿#include <d3d9.h>
+﻿#include "imgui.h"
+#include "imgui_impl_dx9.h"
+#include "imgui_impl_win32.h"
+#include <d3d9.h>
 #include "d3dx9.h"
 #pragma comment(lib, "d3d9.lib")
 #pragma comment(lib, "d3dx9.lib")
@@ -25,6 +28,7 @@ static int currentframe = 0;
 static bool ispaused = 1;  
 static int fontHeight = 50;
 static int yposoffset = 0;
+static bool showGui = 0;
 
 // DX9
 IDirect3D9Ex* p_Object = 0;
@@ -44,8 +48,12 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT Message, WPARAM wParam, LPARAM lParam);
 //int DrawStringA(const char* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont);
 int D3D9XInit(HWND hWnd);
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WinProc(HWND hWnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, Message, wParam, lParam))
+		return true;
+
 	switch (Message)
 	{
 	case WM_PAINT:
@@ -117,12 +125,20 @@ int main()
 	wClass.style = CS_VREDRAW | CS_HREDRAW;
 	if (!RegisterClassEx(&wClass)) { exit(1); }
 
-	HWND hWnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, hWindowName, hWindowName, WS_POPUP, 1, 1, Width, Height, 0, 0, 0, 0);
+	HWND hWnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, hWindowName, hWindowName, WS_POPUP, 1, 1, Width, Height, 0, 0, 0, 0); //WS_EX_TRANSPARENT prevents detecting keypress on imgui
 	SetLayeredWindowAttributes(hWnd, 0, 0, LWA_ALPHA);
 	SetLayeredWindowAttributes(hWnd, 0, RGB(0, 0, 0), LWA_COLORKEY);
 	ShowWindowAsync(hWnd, 3);
 
 	D3D9XInit(hWnd);
+
+	//ImGui setup
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(hWnd);
+	ImGui_ImplDX9_Init(p_Device);
 
 	//Init file load
 	fillVector();
@@ -138,7 +154,7 @@ int main()
 			DispatchMessage(&Message);
 			TranslateMessage(&Message);
 		}
-		Sleep(10);
+		
 		auto t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<float, std::milli> fp_ms = t2 - t1; 
 		if (!ispaused) currenttime += (fp_ms.count() / 1000.f);  
@@ -239,10 +255,25 @@ void DrawFilledRect(int x0, int y0, int x1, int y1)
 	g_pLine->End();
 }
 
+
 int DrawingPart()
 {
+	ImGui_ImplDX9_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	if (showGui)
+	{
+		ImGui::Begin("Hello, world!");
+		ImGui::Text("This is some useful text.");
+		ImGui::SliderFloat("Max distance", &currenttime, 0.0f, 100.0f, "%.2fm");
+		ImGui::End();
+	}
+	ImGui::EndFrame();
+
 	p_Device->Clear(0, 0, D3DCLEAR_TARGET, 0, 1.0f, 0);
 	p_Device->BeginScene();
+	ImGui::Render();
+	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 	
 	if (currenttime >= subtitlePacket[currentframe].secEnd)
 	{
@@ -283,6 +314,10 @@ int DrawingPart()
 	{
 		yposoffset += 2;
 	}
+	if (GetAsyncKeyState(VK_INSERT) & 1)
+	{
+		showGui = !showGui;
+	}
 
 	
 	switch (subtitlePacket[currentframe].sublines)
@@ -295,7 +330,7 @@ int DrawingPart()
 	case 2:
 		//DrawFilledRect(0, 0, 200, 50);
 		DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
-		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 0, 0, 255, pFontBig);
 		DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width/2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
 
 		break;
@@ -317,7 +352,7 @@ int DrawingPart()
 	//DrawFilledRectangle(1, 1, 60, 10, 200, 20, 20, 20);
 	//DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width/2, 50, 255, 255, 255, 255, pFontBig); //(wchar_t*)L"（YOU(ユウ)）テラスハウスは 見ず知らずの男女６人が" instead of hei.c_str()
 	//DrawStringW(hei.c_str(), 1, 1, 255, 255, 255, 255, pFontSmall); //delete this
-
+	
 
 	p_Device->EndScene();
 	p_Device->PresentEx(0, 0, 0, 0, 0);
