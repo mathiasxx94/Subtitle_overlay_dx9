@@ -279,6 +279,11 @@ int DrawingPart()
 	{
 		currentframe += 1;
 	}
+	if (currenttime <= subtitlePacket[currentframe].secStart)
+	{
+		if (currentframe != 0)
+		currentframe -= 1;
+	}
 	if (GetAsyncKeyState(VK_RIGHT) & 1)     
 	{
 		currentframe += 1;
@@ -320,28 +325,31 @@ int DrawingPart()
 	}
 
 	
-	switch (subtitlePacket[currentframe].sublines)
+	if (currenttime >= subtitlePacket[currentframe].secStart && currenttime <= subtitlePacket[currentframe].secEnd)
 	{
-	case 1: 
-		DrawFilledRectangle(Width/2 - subtitlePacket[currentframe].longestWidth / 2 -3, 1300 + yposoffset, Width/2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 45 + yposoffset, 200, 10, 10, 10);
-		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+		switch (subtitlePacket[currentframe].sublines)
+		{
+		case 1:
+			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 45 + yposoffset, 200, 10, 10, 10);
+			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
 
-		break;
-	case 2:
-		//DrawFilledRect(0, 0, 200, 50);
-		DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
-		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 0, 0, 255, pFontBig);
-		DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width/2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
+			break;
+		case 2:
+			//DrawFilledRect(0, 0, 200, 50);
+			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
+			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 0, 0, 255, pFontBig);
+			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
 
-		break;
+			break;
 
-	case 3:
-		DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 +3, 1300 + 135 + yposoffset, 200, 10, 10, 10);
-		DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
-		DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width/2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
-		DrawStringW(subtitlePacket[currentframe].subline3.c_str(), Width/2 - subtitlePacket[currentframe].line3Width / 2, 1300 + 80 + yposoffset, 255, 255, 255, 255, pFontBig);
-		
-		break;    
+		case 3:
+			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 135 + yposoffset, 200, 10, 10, 10);
+			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawStringW(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - subtitlePacket[currentframe].line3Width / 2, 1300 + 80 + yposoffset, 255, 255, 255, 255, pFontBig);
+
+			break;
+		}
 	}
 	
 
