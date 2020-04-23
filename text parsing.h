@@ -17,7 +17,10 @@ struct timeSubpacket
 	int currframe;
 	int sublines;
 
-	int lineHeight;
+	struct Linewidth
+	{
+
+	};
 	int longestWidth;
 	int line1Width;
 	int line2Width;

@@ -1,40 +1,13 @@
-﻿#include "imgui.h"
-#include "imgui_impl_dx9.h"
-#include "imgui_impl_win32.h"
-#include <d3d9.h>
-#include "d3dx9.h"
-#pragma comment(lib, "d3d9.lib")
-#pragma comment(lib, "d3dx9.lib")
-#include <dwmapi.h>
-#pragma comment(lib, "dwmapi.lib")  
-
-#include <windows.h>
-#include <iostream>
-#include <chrono>
-#include <iomanip>
-
-#include "text parsing.h"
-#include "imguicustom.h"
+﻿
 
 
 
-// Window
-wchar_t hWindowName[256] = L"Subtitle_generator"; 
+#include "main.h"
+
 int Height, Width;
-std::wstring ligne;
+wchar_t hWindowName[256] = L"Subtitle_generator";
+const char* fonts[]{ "Meiryo", "MS PMincho", "MS Gothic", "IPA Gothic", "MS Mincho", "Sazanami Mincho", };
 std::vector<timeSubpacket> subtitlePacket;
-
-static float currenttime = 0;
-static int currentframe = 0;
-static bool ispaused = 1;  
-static int fontHeight = 70; //50
-static int yposoffset = 0;
-static bool showGui = 0;
-static bool enablebackground{ 1 };
-//static int fontsize;
-
-static float textcolor[3]{ 1.f, 1.f, 1.f };
-static float backgroundcolor[3]{ 0.1f, 0.1f, 0.1f };
 
 // DX9
 IDirect3D9Ex* p_Object = 0;
@@ -44,7 +17,6 @@ ID3DXFont* pFontSmall = 0;
 ID3DXFont* pFontBig = 0;
 const MARGINS margin = { -1 };
 MSG Message;
-
 LPD3DXSPRITE m_pSprite;
 
 // Functions
@@ -52,7 +24,6 @@ int DrawingPart();
 void fillWidths(ID3DXFont* ifont);    
 
 LRESULT CALLBACK WinProc(HWND hWnd, UINT Message, WPARAM wParam, LPARAM lParam);
-//int DrawStringA(const char* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont);
 int D3D9XInit(HWND hWnd);
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -234,10 +205,7 @@ int DrawStringW(const wchar_t* String, int x, int y, int r, int g, int b, int a,
 	RECT FontPos;
 	FontPos.left = x;
 	FontPos.top = y;
-	int red = textcolor[0] * 255;
-	int green = textcolor[1] * 255;
-	int blue = textcolor[2] * 255;
-	ifont->DrawTextW(m_pSprite, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(255, red, green, blue));
+	ifont->DrawTextW(m_pSprite, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(255, int(textcolor[0] * 255), int(textcolor[1] * 255), int(textcolor[2] * 255)));
 	return 0;
 }
 
@@ -260,34 +228,12 @@ void DrawFilledRectangle(float x, float y, float w, float h, int a, int r, int g
 	p_Device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_TARGET, D3DCOLOR_ARGB(255, red, green, blue), 0, 0);
 }
 
-void DrawFilledRect(int x0, int y0, int x1, int y1)
-{
-	int w = x1 - x0;
-	int h = y1 - y0;
-	ID3DXLine* g_pLine = 0;
-	D3DXCreateLine(p_Device, &g_pLine);
-
-	g_pLine->SetWidth(h);
-	g_pLine->SetAntialias(0);
-
-	D3DXVECTOR2 VertexList[2];
-	VertexList[0].x = x0;
-	VertexList[0].y = y0 + (h >> 1);
-	VertexList[1].x = x0 + w;
-	VertexList[1].y = y0 + (h >> 1);
-
-	D3DXVECTOR2 lines[] = { D3DXVECTOR2(0.0f, 50.0f), D3DXVECTOR2(400.0f, 500.0f) };
-
-	g_pLine->Begin();
-	g_pLine->Draw(lines, 2, D3DCOLOR_ARGB(100, 10, 10, 10));
-	g_pLine->End();
-}
-
 void controlButtons()
 {
 	if (currenttime + 0.001 >= subtitlePacket[currentframe].secEnd)
 	{
-		currentframe += 1;
+		if (currentframe!= subtitlePacket[subtitlePacket.size() -1].currframe)
+			currentframe += 1;
 	}
 	if (currenttime + 0.001 <= subtitlePacket[currentframe].secStart)
 	{
@@ -298,28 +244,16 @@ void controlButtons()
 	{
 		currentframe += 1;
 		currenttime = subtitlePacket[currentframe].secStart;
-
-		system("CLS");
-		std::cout << "Frame: " << currentframe << std::endl;
-		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << " seconds";
 	}
 	if (GetAsyncKeyState(VK_LEFT) & 1)
 	{
 		currentframe -= 1;
 		if (currentframe < 0) currentframe = 0;
 		currenttime = subtitlePacket[currentframe].secStart;
-
-		system("CLS");
-		std::cout << "Frame: " << currentframe << std::endl;
-		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << "seconds";
 	}
 	if (GetAsyncKeyState(VK_SPACE) & 1)
 	{
 		ispaused = !ispaused;
-
-		system("CLS");
-		std::cout << "Frame: " << currentframe << std::endl;
-		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << "seconds";
 	}
 	if (GetAsyncKeyState(VK_UP) & 1)
 	{
@@ -335,17 +269,17 @@ void controlButtons()
 	}
 }
 
-void setvalidColor(float param[3])
+/*
+void assignFont()
 {
-	if((param[0] <= 0.001f) && (param[1] <= 0.001f) && (param[2] <= 0.001f))
-		std::fill(param, param + 3, 0.002f);
-}
-
-void reassignFont()
-{
+	if(pFontBig) 
 	pFontBig->Release();
-	D3DXCreateFontW(p_Device, fontHeight, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Meiryo", &pFontBig); //MS PMincho 
+	size_t length = strlen(fonts[currentfont]);
+	wchar_t text_wchar[30];
+	mbstowcs(text_wchar, fonts[currentfont], length+1);
+	D3DXCreateFontW(p_Device, fontHeight, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, text_wchar, &pFontBig); //MS PMincho 
 }
+*/
 
 int DrawingPart()
 {
@@ -354,19 +288,27 @@ int DrawingPart()
 	ImGui::NewFrame();
 	if (showGui)
 	{
-		ImGui::Begin("gh");
-		ImGui::SliderFloat("Timeline", &currenttime, 0.0f, 100.0f, "%.2fm");
+		ImGui::Begin("Terrace house subtitles");
+		ImGui::SliderFloat("Timeline: ", &currenttime, 0.0f, subtitlePacket[subtitlePacket.size()-1].secStart);
+		ImGui::SameLine();
+		ImGui::Text("%0d min %0d sec", static_cast<int>(currenttime) / 60, static_cast<int>(currenttime) % 60);
 		
-		ImGuiCustom::colorPicker("Text color", textcolor);
-		ImGuiCustom::colorPicker("Background color", backgroundcolor, &enablebackground);
+		ImGuiCustom::colorPicker("Text color", textcolor); setvalidColor(textcolor);
+		ImGuiCustom::colorPicker("Background", backgroundcolor, &enablebackground); setvalidColor(backgroundcolor);
+		ImGuiCustom::colorPicker("Dropshadow", dropshadowcolor, &enabledropshadow); setvalidColor(dropshadowcolor);
+		ImGuiCustom::colorPicker("Text border", textbordercolor, &enabletextborder); setvalidColor(textbordercolor);
+
 		if (ImGui::InputInt("Font size", &fontHeight))
 		{
-			reassignFont();
+			assignFont();
 			fillWidths(pFontBig);
 		}
-
-		setvalidColor(textcolor);
-		setvalidColor(backgroundcolor);
+		
+		if (ImGui::Combo("Font", &currentfont, fonts, IM_ARRAYSIZE(fonts)))
+		{
+			assignFont();
+			fillWidths(pFontBig);
+		}
 		
 		ImGui::End();
 	}
