@@ -27,11 +27,14 @@ std::vector<timeSubpacket> subtitlePacket;
 static float currenttime = 0;
 static int currentframe = 0;
 static bool ispaused = 1;  
-static int fontHeight = 50;
+static int fontHeight = 70; //50
 static int yposoffset = 0;
 static bool showGui = 0;
+static bool enablebackground{ 1 };
+//static int fontsize;
 
 static float textcolor[3]{ 1.f, 1.f, 1.f };
+static float backgroundcolor[3]{ 0.1f, 0.1f, 0.1f };
 
 // DX9
 IDirect3D9Ex* p_Object = 0;
@@ -42,6 +45,7 @@ ID3DXFont* pFontBig = 0;
 const MARGINS margin = { -1 };
 MSG Message;
 
+LPD3DXSPRITE m_pSprite;
 
 // Functions
 int DrawingPart();
@@ -95,6 +99,7 @@ int D3D9XInit(HWND hWnd)
 	p_Params.BackBufferHeight = Height;
 	p_Params.EnableAutoDepthStencil = TRUE;
 	p_Params.AutoDepthStencilFormat = D3DFMT_D16;
+	
 
 	if (FAILED(p_Object->CreateDeviceEx(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &p_Params, 0, &p_Device)))
 	{
@@ -103,6 +108,10 @@ int D3D9XInit(HWND hWnd)
 
 	D3DXCreateFontA(p_Device, 20, 0, 0, 0, false, DEFAULT_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, "Calibri Light", &pFontSmall);
 	D3DXCreateFontW(p_Device, fontHeight, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Meiryo", &pFontBig); //MS PMincho 
+	D3DXCreateSprite(p_Device, &m_pSprite);
+
+	//under test slett
+	p_Device->SetRenderState(D3DRS_MULTISAMPLEANTIALIAS, TRUE);
 
 	return 0;
 }
@@ -131,6 +140,7 @@ int main()
 	HWND hWnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, hWindowName, hWindowName, WS_POPUP, 1, 1, Width, Height, 0, 0, 0, 0); //WS_EX_TRANSPARENT prevents detecting keypress on imgui
 	SetLayeredWindowAttributes(hWnd, 0, 0, LWA_ALPHA);
 	SetLayeredWindowAttributes(hWnd, 0, RGB(0, 0, 0), LWA_COLORKEY);
+	
 	ShowWindowAsync(hWnd, 3);
 
 	D3D9XInit(hWnd);
@@ -160,7 +170,7 @@ int main()
 		
 		auto t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<float, std::milli> fp_ms = t2 - t1; 
-		if (!ispaused) currenttime += (fp_ms.count() / 1000.f);  
+		if (!ispaused) currenttime += (fp_ms.count() / 1000.f); 
 	}
 	
 	return 0;
@@ -227,7 +237,16 @@ int DrawStringW(const wchar_t* String, int x, int y, int r, int g, int b, int a,
 	int red = textcolor[0] * 255;
 	int green = textcolor[1] * 255;
 	int blue = textcolor[2] * 255;
-	ifont->DrawTextW(0, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(255, red, green, blue));
+	ifont->DrawTextW(m_pSprite, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(255, red, green, blue));
+	return 0;
+}
+
+int DrawStringW2(const wchar_t* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont)
+{
+	RECT FontPos;
+	FontPos.left = x;
+	FontPos.top = y;
+	ifont->DrawTextW(m_pSprite, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, D3DCOLOR_ARGB(255, r, g, b));
 	return 0;
 }
 
@@ -235,7 +254,10 @@ void DrawFilledRectangle(float x, float y, float w, float h, int a, int r, int g
 {
 	D3DCOLOR color = D3DCOLOR_ARGB(a, r, g, b);
 	D3DRECT rect = { x, y, w, h };
-	p_Device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_TARGET, color, 0, 0);
+	int red = backgroundcolor[0] * 255;
+	int green = backgroundcolor[1] * 255;
+	int blue = backgroundcolor[2] * 255;
+	p_Device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_TARGET, D3DCOLOR_ARGB(255, red, green, blue), 0, 0);
 }
 
 void DrawFilledRect(int x0, int y0, int x1, int y1)
@@ -261,55 +283,30 @@ void DrawFilledRect(int x0, int y0, int x1, int y1)
 	g_pLine->End();
 }
 
-
-int DrawingPart()
+void controlButtons()
 {
-	ImGui_ImplDX9_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-	if (showGui)
-	{
-		ImGui::Begin("Hello, world!");
-		ImGui::SliderFloat("Timeline", &currenttime, 0.0f, 100.0f, "%.2fm");
-		//ImGui::ColorPicker3("Text color", textcolor, ImGuiColorEditFlags_PickerHueWheel);
-		ImGuiCustom::colorPicker("Text color", textcolor);
-		if ((textcolor[0] <= 0.001f) && (textcolor[1] <= 0.001f) && (textcolor[2] <= 0.001f))
-		{
-			textcolor[0] = 0.002f;
-			textcolor[1] = 0.002f;
-			textcolor[2] = 0.002f;
-		}
-		ImGui::End();
-	}
-	ImGui::EndFrame();
-
-	p_Device->Clear(0, 0, D3DCLEAR_TARGET, 0, 1.0f, 0);
-	p_Device->BeginScene();
-	ImGui::Render();
-	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
-	
-	if (currenttime >= subtitlePacket[currentframe].secEnd)
+	if (currenttime + 0.001 >= subtitlePacket[currentframe].secEnd)
 	{
 		currentframe += 1;
 	}
-	if (currenttime <= subtitlePacket[currentframe].secStart)
+	if (currenttime + 0.001 <= subtitlePacket[currentframe].secStart)
 	{
 		if (currentframe != 0)
-		currentframe -= 1;
+			currentframe -= 1;
 	}
-	if (GetAsyncKeyState(VK_RIGHT) & 1)     
+	if (GetAsyncKeyState(VK_RIGHT) & 1)
 	{
 		currentframe += 1;
 		currenttime = subtitlePacket[currentframe].secStart;
 
 		system("CLS");
 		std::cout << "Frame: " << currentframe << std::endl;
-		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << " seconds";  
+		std::cout << "Time: " << std::fixed << std::setprecision(2) << currenttime << " seconds";
 	}
 	if (GetAsyncKeyState(VK_LEFT) & 1)
 	{
 		currentframe -= 1;
-		if (currentframe < 0) currentframe = 0; 
+		if (currentframe < 0) currentframe = 0;
 		currenttime = subtitlePacket[currentframe].secStart;
 
 		system("CLS");
@@ -336,26 +333,78 @@ int DrawingPart()
 	{
 		showGui = !showGui;
 	}
+}
+
+void setvalidColor(float param[3])
+{
+	if((param[0] <= 0.001f) && (param[1] <= 0.001f) && (param[2] <= 0.001f))
+		std::fill(param, param + 3, 0.002f);
+}
+
+void reassignFont()
+{
+	pFontBig->Release();
+	D3DXCreateFontW(p_Device, fontHeight, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Meiryo", &pFontBig); //MS PMincho 
+}
+
+int DrawingPart()
+{
+	ImGui_ImplDX9_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	if (showGui)
+	{
+		ImGui::Begin("gh");
+		ImGui::SliderFloat("Timeline", &currenttime, 0.0f, 100.0f, "%.2fm");
+		
+		ImGuiCustom::colorPicker("Text color", textcolor);
+		ImGuiCustom::colorPicker("Background color", backgroundcolor, &enablebackground);
+		if (ImGui::InputInt("Font size", &fontHeight))
+		{
+			reassignFont();
+			fillWidths(pFontBig);
+		}
+
+		setvalidColor(textcolor);
+		setvalidColor(backgroundcolor);
+		
+		ImGui::End();
+	}
+	ImGui::EndFrame();
+
+	p_Device->Clear(0, 0, D3DCLEAR_TARGET, 0, 1.0f, 0);
+	p_Device->BeginScene();
+	m_pSprite->Begin(D3DXSPRITE_ALPHABLEND);
+	ImGui::Render();
+	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+	
+	controlButtons();
 
 	
-	if (currenttime >= subtitlePacket[currentframe].secStart && currenttime <= subtitlePacket[currentframe].secEnd)
+	if (currenttime+0.01 > subtitlePacket[currentframe].secStart && currenttime+0.01 < subtitlePacket[currentframe].secEnd)
 	{
 		switch (subtitlePacket[currentframe].sublines)
 		{
 		case 1:
+			if (enablebackground)
 			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 45 + yposoffset, 200, 10, 10, 10);
 			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
 
 			break;
 		case 2:
-			//DrawFilledRect(0, 0, 200, 50);
+			if(enablebackground)
 			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2 +2, 1300 + yposoffset, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2 - 2, 1300 + yposoffset, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset+2, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset-2, 10, 10, 10, 255, pFontBig); //dropshadow test
 			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 0, 0, 255, pFontBig);
 			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
 
 			break;
 
 		case 3:
+			if (enablebackground)
 			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 135 + yposoffset, 200, 10, 10, 10);
 			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
 			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
@@ -364,6 +413,7 @@ int DrawingPart()
 			break;
 		}
 	}
+	
 	
 
 	//ligne = subtitlePacket[currentframe].subline1;
@@ -374,7 +424,7 @@ int DrawingPart()
 	//DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width/2 - subtitlePacket[currentframe].line1Width/2, 50, 255, 255, 255, 255, pFontBig); //(wchar_t*)L"（YOU(ユウ)）テラスハウスは 見ず知らずの男女６人が" instead of hei.c_str()
 	//DrawStringW(hei.c_str(), 1, 1, 255, 255, 255, 255, pFontSmall); //delete this
 	
-
+	m_pSprite->End();
 	p_Device->EndScene();
 	p_Device->PresentEx(0, 0, 0, 0, 0);
 	return 0;

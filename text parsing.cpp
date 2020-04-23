@@ -122,6 +122,7 @@ void fillVector()
 	while (getline(subtitlefile, Line))
 	{
 		timeSubpacket packet; //declare new inside loop to prevent data from previous subtitles with more lines than one.
+
 		wLine = FromUTF8(Line.c_str());
 		packet.currframe = std::stoi(Line.substr(0, 4)) - 1; 
 		getline(subtitlefile, Line); //This should be the time slot of each packet
