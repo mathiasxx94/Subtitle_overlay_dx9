@@ -17,6 +17,8 @@ int Height = GetSystemMetrics(SM_CYSCREEN);
 
 const char* fonts[]{ "Meiryo", "MS PMincho", "MS Gothic", "IPA Gothic", "MS Mincho", "Sazanami Mincho", };
 std::vector<timeSubpacket> subtitlePacket;
+Linewidth linewidth;
+
 
 int currentfont{ 0 };
 int fontHeight{ 70 };
@@ -24,8 +26,9 @@ float currenttime = 0;
 
 
 int currentframe = 0;
+int previousframe;
 bool ispaused = 1;
-int yposoffset = 0;
+int yposoffset = 200;
 bool showGui = 1;
 bool enablebackground{ 1 };
 bool enabledropshadow{ 1 };
@@ -41,6 +44,7 @@ float textbordercolor[3]{ 0.01f, 0.01f , 0.01f };
 // Functions
 int DrawingPart();
 void fillWidths(ID3DXFont* ifont);    
+void setWidth();
 
 LRESULT CALLBACK WinProc(HWND hWnd, UINT Message, WPARAM wParam, LPARAM lParam);
 int D3D9XInit(HWND hWnd);
@@ -113,7 +117,8 @@ int main()
 
 	//Init file load
 	fillVector();
-	fillWidths(pFontBig);
+	//fillWidths(pFontBig);
+	setWidth();
 	
 	MSG Message;
 	for (;;)
@@ -179,6 +184,48 @@ int calctextWidth(const wchar_t* String, ID3DXFont* ifont)
 	return width;
 }
 
+void setWidth()
+{
+	std::wstring  string;
+
+	switch (subtitlePacket[currentframe].sublines)
+	{
+	case 1:
+		string = subtitlePacket[currentframe].subline1;
+		linewidth.line1Width = calctextWidth(string.c_str(), pFontBig);
+		linewidth.longestWidth = linewidth.line1Width;
+
+		break;
+	case 2:
+		string = subtitlePacket[currentframe].subline1;
+		linewidth.line1Width = calctextWidth(string.c_str(), pFontBig);
+
+		string = subtitlePacket[currentframe].subline2;
+		linewidth.line2Width = calctextWidth(string.c_str(), pFontBig);
+
+		linewidth.longestWidth = max(linewidth.line1Width, linewidth.line2Width);
+
+		break;
+
+	case 3:
+		string = subtitlePacket[currentframe].subline1;
+		linewidth.line1Width = calctextWidth(string.c_str(), pFontBig);
+
+		string = subtitlePacket[currentframe].subline2;
+		linewidth.line2Width = calctextWidth(string.c_str(), pFontBig);
+
+		string = subtitlePacket[currentframe].subline3;
+		linewidth.line3Width = calctextWidth(string.c_str(), pFontBig);
+
+		int var = max(linewidth.line1Width, linewidth.line2Width);
+
+		linewidth.longestWidth = max(var, linewidth.line3Width);
+
+		break;
+	}
+
+}
+
 void fillWidths(ID3DXFont* ifont) 
 {
 	std::wstring  string;
@@ -241,6 +288,15 @@ int DrawStringW(const wchar_t* String, int x, int y, int r, int g, int b, int a,
 	return 0;
 }
 
+void DrawStringW3(const wchar_t* String, int x, int y, float col[3], ID3DXFont* ifont)
+{
+	D3DCOLOR color = D3DCOLOR_ARGB(255, int(col[0] * 255), int(col[1] * 255), int(col[2] * 255));
+	RECT FontPos;
+	FontPos.left = x;
+	FontPos.top = y;
+	ifont->DrawTextW(m_pSprite, String, wcslen(String), &FontPos, DT_SINGLELINE | DT_NOCLIP, color);
+}
+
 int DrawStringW2(const wchar_t* String, int x, int y, int r, int g, int b, int a, ID3DXFont* ifont)
 {
 	RECT FontPos;
@@ -250,18 +306,17 @@ int DrawStringW2(const wchar_t* String, int x, int y, int r, int g, int b, int a
 	return 0;
 }
 
-void DrawFilledRectangle(float x, float y, float w, float h, int a, int r, int g, int b)
+void DrawFilledRectangle(float x, float y, float w, float h, float col[3])
 {
-	D3DCOLOR color = D3DCOLOR_ARGB(a, r, g, b);
+	D3DCOLOR color = D3DCOLOR_ARGB(255, int(col[0] * 255), int(col[1] * 255), int(col[2] * 255));
 	D3DRECT rect = { x, y, w, h };
-	int red = backgroundcolor[0] * 255;
-	int green = backgroundcolor[1] * 255;
-	int blue = backgroundcolor[2] * 255;
-	p_Device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_TARGET, D3DCOLOR_ARGB(255, red, green, blue), 0, 0);
+	
+	p_Device->Clear(1, &rect, D3DCLEAR_TARGET | D3DCLEAR_TARGET, color, 0, 0);
 }
 
 void controlButtons()
 {
+	previousframe = currentframe;
 	if (currenttime + 0.001 >= subtitlePacket[currentframe].secEnd)
 	{
 		if (currentframe!= subtitlePacket[subtitlePacket.size() -1].currframe)
@@ -299,20 +354,89 @@ void controlButtons()
 	{
 		showGui = !showGui;
 	}
+	if (!(previousframe == currentframe))
+		setWidth();
+	
 }
 
-/*
-void assignFont2()
+void renderPacket()
 {
-	if(pFontBig) 
-	pFontBig->Release();
-	size_t length = strlen(fonts[currentfont]);
-	wchar_t text_wchar[30];
-	mbstowcs(text_wchar, fonts[currentfont], length+1);
-	D3DXCreateFontW(p_Device, fontHeight, 0, 0, 0, false, SHIFTJIS_CHARSET, OUT_CHARACTER_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, text_wchar, &pFontBig); //MS PMincho 
-}
-*/
+	switch (subtitlePacket[currentframe].sublines)
+	{
+	case 1:
+		if (enablebackground)
+			DrawFilledRectangle(Width / 2 - linewidth.longestWidth / 2 - 3, Height - yposoffset, Width / 2 + linewidth.longestWidth / 2 + 3, Height - yposoffset + fontHeight, backgroundcolor);
+		if (enabledropshadow)
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 + 2, Height - yposoffset + 2, dropshadowcolor, pFontBig);
+		if (enabletextborder)
+		{
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 + 2, Height - yposoffset, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 - 2, Height - yposoffset, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset + 2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset - 2, textbordercolor, pFontBig);
+		}
 
+		DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset, textcolor, pFontBig);
+
+		break;
+	case 2:
+		if (enablebackground)
+			DrawFilledRectangle(Width / 2 - linewidth.longestWidth / 2 - 3, Height - yposoffset, Width / 2 + linewidth.longestWidth / 2 + 3, Height - yposoffset + fontHeight*2, backgroundcolor);
+		if (enabledropshadow)
+		{
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 + 2, Height - yposoffset + 2, dropshadowcolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2 + 2, Height - yposoffset + 2 + fontHeight, dropshadowcolor, pFontBig);
+		}
+		else if (enabletextborder)
+		{
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 + 2, Height - yposoffset, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 - 2, Height - yposoffset, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset + 2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset - 2, textbordercolor, pFontBig);
+
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2 + 2, Height - yposoffset + fontHeight, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2 - 2, Height - yposoffset + fontHeight, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, Height - yposoffset + fontHeight + 2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, Height - yposoffset + fontHeight - 2, textbordercolor, pFontBig);
+		}
+		DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset, textcolor, pFontBig);
+		DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, Height - yposoffset + fontHeight, textcolor, pFontBig);
+		
+		break;
+
+	case 3:
+		if (enablebackground)
+			DrawFilledRectangle(Width / 2 - linewidth.longestWidth / 2 - 3, Height - yposoffset, Width / 2 + linewidth.longestWidth / 2 + 3, Height - yposoffset + fontHeight * 2, backgroundcolor);
+		if (enabledropshadow)
+		{
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 + 2, Height - yposoffset + 2, dropshadowcolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2 + 2, Height - yposoffset + 2 + fontHeight, dropshadowcolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2 + 2, Height - yposoffset + 2 + fontHeight*2, dropshadowcolor, pFontBig);
+		}
+		else if (enabletextborder)
+		{
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 + 2, Height - yposoffset, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 - 2, Height - yposoffset, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset + 2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset - 2, textbordercolor, pFontBig);
+
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2 + 2, Height - yposoffset + fontHeight, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2 - 2, Height - yposoffset + fontHeight, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, Height - yposoffset + fontHeight + 2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, Height - yposoffset + fontHeight - 2, textbordercolor, pFontBig);
+
+			DrawStringW3(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2 + 2, Height - yposoffset + fontHeight*2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2 - 2, Height - yposoffset + fontHeight*2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2, Height - yposoffset + fontHeight*2 + 2, textbordercolor, pFontBig);
+			DrawStringW3(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2, Height - yposoffset + fontHeight*2 - 2, textbordercolor, pFontBig);
+		}
+		DrawStringW3(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, Height - yposoffset, textcolor, pFontBig);
+		DrawStringW3(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, Height - yposoffset + fontHeight, textcolor, pFontBig);
+		DrawStringW3(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2, Height - yposoffset + fontHeight*2, textcolor, pFontBig);
+
+		break;
+	}
+}
 
 int DrawingPart()
 {
@@ -329,18 +453,22 @@ int DrawingPart()
 		ImGuiCustom::colorPicker("Text color", textcolor); setvalidColor(textcolor);
 		ImGuiCustom::colorPicker("Background", backgroundcolor, &enablebackground); setvalidColor(backgroundcolor);
 		ImGuiCustom::colorPicker("Dropshadow", dropshadowcolor, &enabledropshadow); setvalidColor(dropshadowcolor);
+		if (enabledropshadow)
+			enabletextborder = false;
 		ImGuiCustom::colorPicker("Text border", textbordercolor, &enabletextborder); setvalidColor(textbordercolor);
+		if (enabletextborder)
+			enabledropshadow = false;
 
 		if (ImGui::InputInt("Font size", &fontHeight))
 		{
 			assignFont();
-			fillWidths(pFontBig);
+			setWidth();
 		}
 		
 		if (ImGui::Combo("Font", &currentfont, fonts, IM_ARRAYSIZE(fonts)))
 		{
 			assignFont();
-			fillWidths(pFontBig);
+			setWidth();
 		}
 		
 		ImGui::End();
@@ -358,35 +486,38 @@ int DrawingPart()
 	
 	if (currenttime+0.01 > subtitlePacket[currentframe].secStart && currenttime+0.01 < subtitlePacket[currentframe].secEnd)
 	{
+		renderPacket();
+		/*
 		switch (subtitlePacket[currentframe].sublines)
 		{
 		case 1:
 			if (enablebackground)
-			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 45 + yposoffset, 200, 10, 10, 10);
-			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawFilledRectangle(Width / 2 - linewidth.longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + linewidth.longestWidth / 2 + 3, 1300 + 45 + yposoffset, backgroundcolor);
+			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
 
 			break;
 		case 2:
 			if(enablebackground)
-			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 90 + yposoffset, 200, 10, 10, 10);
-			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2 +2, 1300 + yposoffset, 10, 10, 10, 255, pFontBig); //dropshadow test
-			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2 - 2, 1300 + yposoffset, 10, 10, 10, 255, pFontBig); //dropshadow test
-			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset+2, 10, 10, 10, 255, pFontBig); //dropshadow test
-			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset-2, 10, 10, 10, 255, pFontBig); //dropshadow test
-			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 0, 0, 255, pFontBig);
-			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawFilledRectangle(Width / 2 - linewidth.longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + linewidth.longestWidth / 2 + 3, 1300 + 90 + yposoffset, backgroundcolor);
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 +2, 1300 + yposoffset, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2 - 2, 1300 + yposoffset, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, 1300 + yposoffset+2, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW2(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, 1300 + yposoffset-2, 10, 10, 10, 255, pFontBig); //dropshadow test
+			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 -  linewidth.line1Width / 2, 1300 + yposoffset, 255, 0, 0, 255, pFontBig);
+			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 -  linewidth.line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
 
 			break;
 
 		case 3:
 			if (enablebackground)
-			DrawFilledRectangle(Width / 2 - subtitlePacket[currentframe].longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + subtitlePacket[currentframe].longestWidth / 2 + 3, 1300 + 135 + yposoffset, 200, 10, 10, 10);
-			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - subtitlePacket[currentframe].line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
-			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - subtitlePacket[currentframe].line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
-			DrawStringW(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - subtitlePacket[currentframe].line3Width / 2, 1300 + 80 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawFilledRectangle(Width / 2 - linewidth.longestWidth / 2 - 3, 1300 + yposoffset, Width / 2 + linewidth.longestWidth / 2 + 3, 1300 + 135 + yposoffset, backgroundcolor);
+			DrawStringW(subtitlePacket[currentframe].subline1.c_str(), Width / 2 - linewidth.line1Width / 2, 1300 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawStringW(subtitlePacket[currentframe].subline2.c_str(), Width / 2 - linewidth.line2Width / 2, 1300 + 40 + yposoffset, 255, 255, 255, 255, pFontBig);
+			DrawStringW(subtitlePacket[currentframe].subline3.c_str(), Width / 2 - linewidth.line3Width / 2, 1300 + 80 + yposoffset, 255, 255, 255, 255, pFontBig);
 
 			break;
 		}
+		*/
 	}
 	
 	
